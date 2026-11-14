@@ -15,12 +15,37 @@ a report.
 
 ## Results
 
-> Paste `results/summary.md` here after running the experiments (see `GUIDE.md`).
+## LLM serving: vLLM vs Hugging Face
 
-![Throughput vs batch size](results/throughput.png)
+Model `Qwen/Qwen2.5-0.5B-Instruct`, greedy decoding, 128 generated tokens per request.
 
-**Key findings:** _(3–4 sentences in your own words after your run: the matmul vs add numbers,
-the vLLM speed-up and latency trade-off, the fusion speed-up, and where the all-reduce appeared.)_
+| Backend | Batch | Tokens/s | Batch latency (s) |
+| --- | --- | --- | --- |
+| vllm | 1 | 174 | 0.74 |
+| vllm | 4 | 690 | 0.74 |
+| vllm | 16 | 2226 | 0.92 |
+| vllm | 64 | 5609 | 1.46 |
+| vllm | 128 | 8915 | 1.84 |
+| hf | 1 | 29 | 4.46 |
+| hf | 4 | 123 | 4.15 |
+| hf | 16 | 488 | 4.20 |
+
+| Batch | vLLM speed-up over HF | First-32-token match rate | Mean matching prefix (tokens) |
+| --- | --- | --- | --- |
+| 1 | 6.0× | 100% | 128 of 128 |
+| 4 | 5.6× | 100% | 117 of 128 |
+| 16 | 4.6× | 100% | 117 of 128 |
+
+vLLM throughput rose 51× from batch 1 to 128, while batch latency rose from 0.74 s to 1.84 s.
+
+results/throughput.png
+
+## Environment
+
+GPU: Tesla T4 · PyTorch 2.11.0+cu130 · CUDA 13.0 · commit 2d19dce · 2026-11-14T10:42:03Z
+
+
+**Key findings.** On a single NVIDIA T4, vLLM served Qwen2.5-0.5B at 8,915 generated tokens per second with 128 concurrent requests, 51× its single-request throughput, while batch latency only rose from 0.74 s to 1.84 s. At the same batch sizes it was 4.6–6.0× faster than plain Hugging Face generation. Decoding is memory-bound, so one load of the model weights serves every request in the batch; vLLM’s continuous batching and paged KV-cache let it batch far more efficiently. Under identical greedy settings, both backends produced the same first 32 tokens for 100% of requests, and matched for 117–128 of the 128 tokens on average. The small late differences come from different float16 kernels breaking near-ties. An earlier run showed a 0% match; I traced it to Hugging Face silently applying the model’s default repetition penalty, aligned the decoding settings, and added a test that guards against it.
 
 ## How each experiment is made trustworthy
 
