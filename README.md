@@ -42,7 +42,7 @@ results/throughput.png
 
 ## Environment
 
-GPU: Tesla T4 · PyTorch 2.11.0+cu130 · CUDA 13.0 · commit 2d19dce · 2026-11-14T10:42:03Z
+GPU: Tesla T4 · PyTorch 2.11.0+cu130 · CUDA 13.0 · 
 
 
 **Key findings.** On a single NVIDIA T4, vLLM served Qwen2.5-0.5B at 8,915 generated tokens per second with 128 concurrent requests, 51× its single-request throughput, while batch latency only rose from 0.74 s to 1.84 s. At the same batch sizes it was 4.6–6.0× faster than plain Hugging Face generation. Decoding is memory-bound, so one load of the model weights serves every request in the batch; vLLM’s continuous batching and paged KV-cache let it batch far more efficiently. Under identical greedy settings, both backends produced the same first 32 tokens for 100% of requests, and matched for 117–128 of the 128 tokens on average. The small late differences come from different float16 kernels breaking near-ties. An earlier run showed a 0% match; I traced it to Hugging Face silently applying the model’s default repetition penalty, aligned the decoding settings, and added a test that guards against it.
