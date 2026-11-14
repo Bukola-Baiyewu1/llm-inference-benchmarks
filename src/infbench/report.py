@@ -81,8 +81,11 @@ def main() -> None:
     if pf:
         env = env or pf["env"]
         s = pf["sync"]
-        lines += ["## Profiling", "", "Top operations by time in an MLP training step:", ""]
-        lines += [f"- {r['share']:.1%} {r['op']}" for r in pf["top_ops"][:5]]
+        unit = "GPU kernels" if pf["device"] == "cuda" else "CPU operations"
+        lines += ["## Profiling", "", f"Top {unit} by self time in an MLP training step:", ""]
+        lines += [f"- {r['share']:.1%} {r['op'][:80]}" for r in pf["top_ops"][:5]]
+        if "gemm_share" in pf:
+            lines += ["", f"Matrix-multiply kernels: {pf['gemm_share']:.1%} of measured time."]
         lines += ["", f"Calling `.item()` every step changed CPU loop time from {s['cpu_ms_no_sync']:.1f} ms "
                       f"to {s['cpu_ms_item_each_step']:.1f} ms over {s['steps']} steps.", ""]
 

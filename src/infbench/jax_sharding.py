@@ -30,14 +30,22 @@ COMM_OPS = ("all-reduce", "reduce-scatter", "all-gather", "collective-permute", 
 
 
 def make_mesh() -> Mesh:
-    devices = np.array(jax.devices()[:8]).reshape(4, 2)
+    # Always use the 8 simulated CPU devices, even on a machine with real GPUs
+    # (e.g. Kaggle's 2 x T4), so the 4 x 2 mesh exists everywhere.
+    cpus = jax.devices("cpu")
+    if len(cpus) < 8:
+        raise RuntimeError(f"need 8 CPU devices, found {len(cpus)}: XLA_FLAGS must be set before JAX starts")
+    devices = np.array(cpus[:8]).reshape(4, 2)
     return Mesh(devices, axis_names=("data", "model"))
 
 
 def sharded_matmul(mode: str, m: int = 256, k: int = 512, n: int = 128) -> dict:
     mesh = make_mesh()
-    kx, kw = jax.random.split(jax.random.PRNGKey(0))
-    x = jax.random.normal(kx, (m, k)); w = jax.random.normal(kw, (k, n))
+    # Keep every array on the CPU devices, so nothing mixes with a real GPU if one exists.
+    with jax.default_device(jax.devices("cpu")[0]):
+        kx, kw = jax.random.split(jax.random.PRNGKey(0))
+        x = jax.random.normal(kx, (m, k)); w = jax.random.normal(kw, (k, n))
+        reference = x @ w
     if mode == "batch":
         x_spec, w_spec = P("data", None), P(None, None)
     elif mode == "contraction":
@@ -52,7 +60,7 @@ def sharded_matmul(mode: str, m: int = 256, k: int = 512, n: int = 128) -> dict:
     found = sorted({op for op in COMM_OPS if op in hlo})
     return {"mode": mode, "x_sharding": str(x_spec), "w_sharding": str(w_spec),
             "communication_ops": found, "has_all_reduce": "all-reduce" in hlo,
-            "matches_unsharded": bool(jnp.allclose(y, x @ w, atol=1e-3)),
+            "matches_unsharded": bool(jnp.allclose(jax.device_get(y), jax.device_get(reference), atol=1e-3)),
             "output_sharding": str(y.sharding.spec)}
 
 
@@ -61,7 +69,7 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default="results/jax_sharding.json")
     a = ap.parse_args()
-    print(f"JAX {jax.__version__}, {len(jax.devices())} devices: {jax.devices()[0].platform}")
+    print(f"JAX {jax.__version__}: using {len(jax.devices('cpu'))} simulated CPU devices for a 4 x 2 mesh")
     rows = [sharded_matmul("batch"), sharded_matmul("contraction")]
     for r in rows:
         print(f"{r['mode']:12s} comm ops: {r['communication_ops'] or 'none'}  matches unsharded: {r['matches_unsharded']}")

@@ -34,14 +34,25 @@ def profile_mlp(device: str, batch: int, d: int, steps: int) -> list[dict]:
             opt.zero_grad(); model(x).pow(2).mean().backward(); opt.step()
         if device == "cuda":
             torch.cuda.synchronize()
-    key = "device_time_total" if device == "cuda" else "cpu_time_total"
     events = prof.key_averages()
-    total = sum(getattr(e, key) for e in events if getattr(e, key) > 0) or 1.0
-    rows = sorted(({"op": e.key, "time_us": float(getattr(e, key))} for e in events),
-                  key=lambda r: -r["time_us"])[:10]
-    for r in rows:
-        r["share"] = r["time_us"] / total
+    if device == "cuda":
+        # Count only real GPU kernels, by their own (self) time. High-level ops such as
+        # aten::mm also report the time of the kernels inside them, so summing every
+        # event would count the same work twice.
+        from torch.autograd import DeviceType
+        items = [(e.key, float(e.self_device_time_total)) for e in events
+                 if e.device_type == DeviceType.CUDA and e.self_device_time_total > 0]
+    else:
+        items = [(e.key, float(e.self_cpu_time_total)) for e in events if e.self_cpu_time_total > 0]
+    total = sum(t for _, t in items) or 1.0
+    rows = [{"op": k, "time_us": t, "share": t / total} for k, t in sorted(items, key=lambda x: -x[1])]
     return rows
+
+
+def gemm_share(rows: list[dict]) -> float:
+    """Share of measured time spent in matrix-multiply kernels (names with gemm / mm)."""
+    keys = ("gemm", "aten::mm", "aten::addmm", "matmul")
+    return sum(r["share"] for r in rows if any(k in r["op"].lower() for k in keys))
 
 
 def sync_cost(device: str, batch: int, d: int, steps: int) -> dict:
@@ -79,13 +90,16 @@ def main() -> None:
     ap.add_argument("--out", default="results/profiling.json")
     a = ap.parse_args()
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    top = profile_mlp(device, a.batch, a.d, a.steps)
+    rows = profile_mlp(device, a.batch, a.d, a.steps)
+    top, gemm = rows[:10], gemm_share(rows)
     sync = sync_cost(device, a.batch, a.d, a.steps)
-    print("Top ops by time:")
+    print(f"Top {'GPU kernels' if device == 'cuda' else 'CPU ops'} by self time:")
     for r in top:
-        print(f"  {r['share']:6.1%}  {r['op']}")
+        print(f"  {r['share']:6.1%}  {r['op'][:90]}")
+    print(f"Matrix-multiply share of {'GPU' if device == 'cuda' else 'CPU'} time: {gemm:.1%}")
     print(f".item() each step: CPU time {sync['cpu_ms_no_sync']:.1f} ms -> {sync['cpu_ms_item_each_step']:.1f} ms")
-    print("saved", save_json({"env": env_info(), "device": device, "top_ops": top, "sync": sync}, a.out))
+    print("saved", save_json({"env": env_info(), "device": device, "top_ops": top,
+                                  "gemm_share": gemm, "sync": sync}, a.out))
 
 
 if __name__ == "__main__":
