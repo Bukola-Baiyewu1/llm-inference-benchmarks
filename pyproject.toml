@@ -1,0 +1,21 @@
+[project]
+name = "llm-inference-benchmarks"
+version = "0.1.0"
+description = "GPU and LLM inference performance: roofline, profiling, Triton kernels, JAX sharding, vLLM vs Hugging Face"
+requires-python = ">=3.10"
+dependencies = ["torch>=2.2", "numpy>=1.26", "matplotlib>=3.8", "jax>=0.4.30"]
+
+[project.optional-dependencies]
+serving = ["vllm>=0.6", "transformers>=4.44", "accelerate>=0.33"]
+dev = ["pytest>=8.0"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
