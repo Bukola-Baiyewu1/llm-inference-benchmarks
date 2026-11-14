@@ -106,3 +106,11 @@ def test_backends_use_identical_greedy_settings():
     v, h = inspect.getsource(serving.VLLMBackend.generate), inspect.getsource(serving.HFBackend.generate)
     assert "repetition_penalty=1.0" in v and "repetition_penalty=1.0" in h
     assert "min_tokens=max_tokens" in v and "min_new_tokens=max_tokens" in h
+
+
+def test_profiling_shares_sum_to_one_and_gemm_share():
+    from infbench.profiling import gemm_share, profile_mlp
+    rows = profile_mlp("cpu", batch=8, d=64, steps=2)
+    assert abs(sum(r["share"] for r in rows) - 1.0) < 1e-6   # no double counting
+    assert gemm_share([{"op": "volta_sgemm_128x64_tn", "share": 0.6},
+                       {"op": "elementwise_add", "share": 0.4}]) == 0.6
