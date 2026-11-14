@@ -60,7 +60,10 @@ class VLLMBackend:
 
     def generate(self, prompts, max_tokens):
         from vllm import SamplingParams
-        params = SamplingParams(temperature=0.0, max_tokens=max_tokens, ignore_eos=True)
+        # Identical decoding rules to HFBackend: pure greedy, no repetition penalty,
+        # end-of-text blocked until max_tokens (min_tokens), so every request is the same length.
+        params = SamplingParams(temperature=0.0, max_tokens=max_tokens, min_tokens=max_tokens,
+                                ignore_eos=True, repetition_penalty=1.0)
         outs = self.llm.generate(prompts, params, use_tqdm=False)
         return [list(o.outputs[0].token_ids) for o in outs]
 
@@ -81,8 +84,12 @@ class HFBackend:
     def generate(self, prompts, max_tokens):
         enc = self.tok(prompts, return_tensors="pt", padding=True).to("cuda")
         with self.torch.no_grad():
+            # Override the model's generation_config defaults (Qwen ships repetition_penalty
+            # 1.05-1.1 and sampling settings), so HF runs exactly the same greedy rules as vLLM.
             out = self.model.generate(**enc, max_new_tokens=max_tokens, min_new_tokens=max_tokens,
-                                      do_sample=False, pad_token_id=self.tok.pad_token_id)
+                                      do_sample=False, repetition_penalty=1.0,
+                                      temperature=None, top_p=None, top_k=None,
+                                      pad_token_id=self.tok.pad_token_id)
         self.torch.cuda.synchronize()
         return out[:, enc["input_ids"].shape[1]:].tolist()
 
@@ -120,6 +127,19 @@ def token_match_rate(a: list[list[int]], b: list[list[int]], first_k: int = 32) 
     if not pairs:
         return 0.0
     return sum(x[:first_k] == y[:first_k] for x, y in pairs) / len(pairs)
+
+
+def mean_common_prefix(a: list[list[int]], b: list[list[int]]) -> float:
+    """Average number of leading tokens that agree before the two outputs first differ."""
+    def prefix(x, y):
+        n = 0
+        for p, q in zip(x, y):
+            if p != q:
+                break
+            n += 1
+        return n
+    pairs = list(zip(a, b))
+    return sum(prefix(x, y) for x, y in pairs) / len(pairs) if pairs else 0.0
 
 
 def main() -> None:

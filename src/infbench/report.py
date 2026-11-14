@@ -8,7 +8,7 @@ import argparse
 import json
 from pathlib import Path
 
-from .serving import token_match_rate
+from .serving import mean_common_prefix, token_match_rate
 
 
 def load(path: Path) -> dict | None:
@@ -29,11 +29,13 @@ def serving_section(vllm: dict | None, hf: dict | None) -> list[str]:
     if vllm and hf:
         v = {r["batch"]: r for r in vllm["rows"]}
         h = {r["batch"]: r for r in hf["rows"]}
-        lines += ["", "| Batch | vLLM speed-up over HF | First-32-token match rate |", "| --- | --- | --- |"]
+        lines += ["", "| Batch | vLLM speed-up over HF | First-32-token match rate | Mean matching prefix (tokens) |",
+                  "| --- | --- | --- | --- |"]
         for b in sorted(set(v) & set(h)):
             speed = v[b]["tokens_per_s"] / h[b]["tokens_per_s"]
             match = token_match_rate(vllm["outputs"][str(b)], hf["outputs"][str(b)])
-            lines.append(f"| {b} | {speed:.1f}× | {match:.0%} |")
+            prefix = mean_common_prefix(vllm["outputs"][str(b)], hf["outputs"][str(b)])
+            lines.append(f"| {b} | {speed:.1f}× | {match:.0%} | {prefix:.0f} of {vllm['max_tokens']} |")
     if vllm:
         first, last = vllm["rows"][0], vllm["rows"][-1]
         lines += ["", f"vLLM throughput rose {last['tokens_per_s'] / first['tokens_per_s']:.0f}× from batch "
