@@ -91,3 +91,18 @@ def test_triton_kernels_in_interpreter_mode():
     env = {**os.environ, "TRITON_INTERPRET": "1", "PYTHONPATH": "src"}
     out = subprocess.run([sys.executable, "-c", code], env=env, capture_output=True, text=True)
     assert out.returncode == 0, out.stderr[-2000:]
+
+
+def test_mean_common_prefix():
+    from infbench.serving import mean_common_prefix
+    assert mean_common_prefix([[1, 2, 3]], [[1, 2, 3]]) == 3
+    assert mean_common_prefix([[1, 2, 3], [1, 9, 9]], [[1, 2, 0], [1, 2, 3]]) == 1.5
+
+
+def test_backends_use_identical_greedy_settings():
+    """Guards the bug where HF silently applied the model's repetition penalty."""
+    import inspect
+    from infbench import serving
+    v, h = inspect.getsource(serving.VLLMBackend.generate), inspect.getsource(serving.HFBackend.generate)
+    assert "repetition_penalty=1.0" in v and "repetition_penalty=1.0" in h
+    assert "min_tokens=max_tokens" in v and "min_new_tokens=max_tokens" in h
