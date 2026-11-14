@@ -1,0 +1,50 @@
+{
+  "env": {
+    "python": "3.13.16",
+    "platform": "Linux-6.18.55+-x86_64-with-glibc2.39",
+    "git_commit": "16d9b49",
+    "timestamp": "2026-11-14T11:48:52Z",
+    "torch": "2.11.0+cu130",
+    "cuda": "13.0",
+    "gpu": "Tesla T4"
+  },
+  "device": "cuda",
+  "dtype": "torch.float16",
+  "rows": [
+    {
+      "op": "matmul",
+      "n": 512,
+      "seconds": 5.195500000354514e-05,
+      "tflops": 5.166691482661599,
+      "intensity_flop_per_byte": 170.66666666666666
+    },
+    {
+      "op": "matmul",
+      "n": 1024,
+      "seconds": 0.00012926049998895905,
+      "tflops": 16.61361087248951,
+      "intensity_flop_per_byte": 341.3333333333333
+    },
+    {
+      "op": "matmul",
+      "n": 2048,
+      "seconds": 0.000743969500035746,
+      "tflops": 23.09216867516013,
+      "intensity_flop_per_byte": 682.6666666666666
+    },
+    {
+      "op": "matmul",
+      "n": 4096,
+      "seconds": 0.006122005000008812,
+      "tflops": 22.449990398864777,
+      "intensity_flop_per_byte": 1365.3333333333333
+    },
+    {
+      "op": "add",
+      "n": 50000000,
+      "seconds": 0.001213817999996536,
+      "gb_per_s": 247.15402144378825,
+      "intensity_flop_per_byte": 0.16666666666666666
+    }
+  ]
+}

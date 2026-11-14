@@ -4,27 +4,27 @@
   "rows": [
     {
       "batch": 1,
-      "seconds": 4.458294563000038,
+      "seconds": 4.287053849000017,
       "generated_tokens": 128,
-      "tokens_per_s": 28.710530044893964,
-      "batch_latency_s": 4.458294563000038,
-      "ms_per_token_per_request": 34.830426273437794
+      "tokens_per_s": 29.8573343159328,
+      "batch_latency_s": 4.287053849000017,
+      "ms_per_token_per_request": 33.492608195312634
     },
     {
       "batch": 4,
-      "seconds": 4.154364347000012,
+      "seconds": 4.024134172999993,
       "generated_tokens": 512,
-      "tokens_per_s": 123.24388455955486,
-      "batch_latency_s": 4.154364347000012,
-      "ms_per_token_per_request": 32.45597146093759
+      "tokens_per_s": 127.23233818476382,
+      "batch_latency_s": 4.024134172999993,
+      "ms_per_token_per_request": 31.438548226562446
     },
     {
       "batch": 16,
-      "seconds": 4.200585495999974,
+      "seconds": 4.063106183999935,
       "generated_tokens": 2048,
-      "tokens_per_s": 487.55108114100216,
-      "batch_latency_s": 4.200585495999974,
-      "ms_per_token_per_request": 32.8170741874998
+      "tokens_per_s": 504.0478656612024,
+      "batch_latency_s": 4.063106183999935,
+      "ms_per_token_per_request": 31.74301706249949
     }
   ],
   "outputs": {
@@ -2770,8 +2770,8 @@
   "env": {
     "python": "3.13.16",
     "platform": "Linux-6.18.55+-x86_64-with-glibc2.39",
-    "git_commit": "2d19dce",
-    "timestamp": "2026-11-14T10:42:46Z",
+    "git_commit": "16d9b49",
+    "timestamp": "2026-11-14T11:48:47Z",
     "torch": "2.11.0+cu130",
     "cuda": "13.0",
     "gpu": "Tesla T4"

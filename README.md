@@ -15,37 +15,87 @@ a report.
 
 ## Results
 
-## LLM serving: vLLM vs Hugging Face
+**Key findings** (one NVIDIA T4, November 2026):
+
+- **Compute vs memory.** A large matrix multiply reached 23.1 TFLOPS, while an element-wise add was capped at 247 GB/s, about 77% of the T4's ~320 GB/s memory bandwidth. The add does under 0.2 operations per byte moved, so memory, not maths, sets its speed.
+- **Profiling.** Matrix-multiply kernels took 74.7% of GPU time in an MLP training step; most of the rest was the optimizer's weight update, which is large at a small batch size. Calling `.item()` every step raised CPU loop time from 2.6 ms to 11.6 ms (4.5×), because each call forces the CPU to wait for the GPU.
+- **Triton.** Both kernels matched PyTorch on all six sizes, including partial last blocks. A plain Triton add tied PyTorch (both at memory bandwidth), while fusing add + ReLU into one kernel was 1.66× faster than PyTorch's two separate operations, because the intermediate result never goes back to memory.
+- **JAX sharding.** Splitting the batch dimension needed no communication; splitting the summed-over (contraction) dimension made XLA insert an all-reduce, and both versions matched the unsharded result.
+- **LLM serving.** vLLM served Qwen2.5-0.5B at 9,226 tokens/s with 128 concurrent requests, 52× its single-request throughput, while batch latency rose only from 0.72 s to 1.78 s. It was 4.5–5.9× faster than Hugging Face at the same batch sizes. Under identical greedy settings the first 32 tokens matched for 100% of requests (117–128 of 128 tokens on average).
+- **A bug the checks caught.** The first serving run showed 0% token agreement. The cause was Hugging Face silently applying the model's default repetition penalty; after aligning the decoding settings the outputs matched, and a test now guards against it.
+
+### Compute-bound vs memory-bound
+
+| Operation | Size | Result | Arithmetic intensity (FLOP/byte) |
+| --- | --- | --- | --- |
+| matmul | 512 | 5.2 TFLOPS | 171 |
+| matmul | 1024 | 16.6 TFLOPS | 341 |
+| matmul | 2048 | 23.1 TFLOPS | 683 |
+| matmul | 4096 | 22.4 TFLOPS | 1.37e+03 |
+| add | 50000000 | 247 GB/s | 0.167 |
+
+### Profiling
+
+Top GPU kernels by self time in an MLP training step:
+
+- 28.6% volta_sgemm_128x64_tn
+- 26.7% volta_sgemm_128x64_nt
+- 23.8% void at::native::(anonymous namespace)::multi_tensor_apply_kernel<at::native::(a
+- 19.4% volta_sgemm_128x64_nn
+- 0.4% void at::native::reduce_kernel<512, 1, at::native::ReduceOp<float, at::native::M
+
+Matrix-multiply kernels: 74.7% of measured time.
+
+Calling `.item()` every step changed CPU loop time from 2.6 ms to 11.6 ms over 10 steps.
+
+### Triton kernels
+
+Correct on all 6 test sizes (including partial last blocks): yes.
+
+| Kernel | Time (ms) |
+| --- | --- |
+| PyTorch add | 2.463 |
+| Triton add | 2.502 |
+| PyTorch add, then ReLU | 4.140 |
+| Triton fused add + ReLU | 2.488 |
+
+Fusion speed-up: 1.66×. Triton add bandwidth: 240 GB/s.
+
+### JAX sharding on a 4 × 2 device mesh
+
+| Sharded dimension | Communication in compiled program | Matches unsharded |
+| --- | --- | --- |
+| batch | none | True |
+| contraction | all-reduce | True |
+
+### LLM serving: vLLM vs Hugging Face
 
 Model `Qwen/Qwen2.5-0.5B-Instruct`, greedy decoding, 128 generated tokens per request.
 
 | Backend | Batch | Tokens/s | Batch latency (s) |
 | --- | --- | --- | --- |
-| vllm | 1 | 174 | 0.74 |
-| vllm | 4 | 690 | 0.74 |
-| vllm | 16 | 2226 | 0.92 |
-| vllm | 64 | 5609 | 1.46 |
-| vllm | 128 | 8915 | 1.84 |
-| hf | 1 | 29 | 4.46 |
-| hf | 4 | 123 | 4.15 |
-| hf | 16 | 488 | 4.20 |
+| vllm | 1 | 177 | 0.72 |
+| vllm | 4 | 697 | 0.73 |
+| vllm | 16 | 2259 | 0.91 |
+| vllm | 64 | 5763 | 1.42 |
+| vllm | 128 | 9226 | 1.78 |
+| hf | 1 | 30 | 4.29 |
+| hf | 4 | 127 | 4.02 |
+| hf | 16 | 504 | 4.06 |
 
 | Batch | vLLM speed-up over HF | First-32-token match rate | Mean matching prefix (tokens) |
 | --- | --- | --- | --- |
-| 1 | 6.0× | 100% | 128 of 128 |
-| 4 | 5.6× | 100% | 117 of 128 |
-| 16 | 4.6× | 100% | 117 of 128 |
+| 1 | 5.9× | 100% | 128 of 128 |
+| 4 | 5.5× | 100% | 117 of 128 |
+| 16 | 4.5× | 100% | 124 of 128 |
 
-vLLM throughput rose 51× from batch 1 to 128, while batch latency rose from 0.74 s to 1.84 s.
+vLLM throughput rose 52× from batch 1 to 128, while batch latency rose from 0.72 s to 1.78 s.
 
-results/throughput.png
+![Throughput vs batch size](results/throughput.png)
 
-## Environment
+### Environment
 
-GPU: Tesla T4 · PyTorch 2.11.0+cu130 · CUDA 13.0 · 
-
-
-**Key findings.** On a single NVIDIA T4, vLLM served Qwen2.5-0.5B at 8,915 generated tokens per second with 128 concurrent requests, 51× its single-request throughput, while batch latency only rose from 0.74 s to 1.84 s. At the same batch sizes it was 4.6–6.0× faster than plain Hugging Face generation. Decoding is memory-bound, so one load of the model weights serves every request in the batch; vLLM’s continuous batching and paged KV-cache let it batch far more efficiently. Under identical greedy settings, both backends produced the same first 32 tokens for 100% of requests, and matched for 117–128 of the 128 tokens on average. The small late differences come from different float16 kernels breaking near-ties. An earlier run showed a 0% match; I traced it to Hugging Face silently applying the model’s default repetition penalty, aligned the decoding settings, and added a test that guards against it.
+GPU: Tesla T4 · PyTorch 2.11.0+cu130 · CUDA 13.0 · commit 16d9b49 · 2026-11-14T11:48:52Z
 
 ## How each experiment is made trustworthy
 
@@ -57,7 +107,7 @@ GPU: Tesla T4 · PyTorch 2.11.0+cu130 · CUDA 13.0 ·
 - **Honest timing.** GPU work is asynchronous, so timers synchronise the GPU before reading
   the clock; warm-up runs are excluded; the median of repeated runs is reported.
 - **Reproducible.** Every result file records the GPU, PyTorch, CUDA and git commit.
-- **Tested.** 9 CPU tests run in CI, including the real Triton kernels in Triton's interpreter
+- **Tested.** 13 CPU tests run in CI, including the real Triton kernels in Triton's interpreter
   mode and the JAX sharding check on 8 simulated devices.
 
 ## Reproduce

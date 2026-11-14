@@ -114,3 +114,9 @@ def test_profiling_shares_sum_to_one_and_gemm_share():
     assert abs(sum(r["share"] for r in rows) - 1.0) < 1e-6   # no double counting
     assert gemm_share([{"op": "volta_sgemm_128x64_tn", "share": 0.6},
                        {"op": "elementwise_add", "share": 0.4}]) == 0.6
+
+
+def test_gemm_share_ignores_nothing_but_kernels():
+    from infbench.profiling import gemm_share
+    rows = [{"op": "volta_sgemm_128x64_nn", "share": 0.75}, {"op": "multi_tensor_apply_kernel", "share": 0.25}]
+    assert gemm_share(rows) == 0.75

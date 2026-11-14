@@ -40,8 +40,11 @@ def profile_mlp(device: str, batch: int, d: int, steps: int) -> list[dict]:
         # aten::mm also report the time of the kernels inside them, so summing every
         # event would count the same work twice.
         from torch.autograd import DeviceType
+        # record_function labels such as "Optimizer.step#SGD.step" also appear on the GPU
+        # timeline but only wrap real kernels, so they are skipped to avoid counting twice.
         items = [(e.key, float(e.self_device_time_total)) for e in events
-                 if e.device_type == DeviceType.CUDA and e.self_device_time_total > 0]
+                 if e.device_type == DeviceType.CUDA and e.self_device_time_total > 0
+                 and "#" not in e.key and not e.key.startswith("ProfilerStep")]
     else:
         items = [(e.key, float(e.self_cpu_time_total)) for e in events if e.self_cpu_time_total > 0]
     total = sum(t for _, t in items) or 1.0

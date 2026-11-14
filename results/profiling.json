@@ -1,0 +1,51 @@
+{
+  "env": {
+    "python": "3.13.16",
+    "platform": "Linux-6.18.55+-x86_64-with-glibc2.39",
+    "git_commit": "16d9b49",
+    "timestamp": "2026-11-14T11:49:06Z",
+    "torch": "2.11.0+cu130",
+    "cuda": "13.0",
+    "gpu": "Tesla T4"
+  },
+  "device": "cuda",
+  "top_ops": [
+    {
+      "op": "volta_sgemm_128x64_tn",
+      "time_us": 9858.833000000002,
+      "share": 0.2856230965139071
+    },
+    {
+      "op": "volta_sgemm_128x64_nt",
+      "time_us": 9216.760000000028,
+      "share": 0.2670214143018272
+    },
+    {
+      "op": "void at::native::(anonymous namespace)::multi_tensor_apply_kernel<at::native::(anonymous namespace)::TensorListMetadata<2>, at::native::(anonymous namespace)::BinaryOpListAlphaFunctor<float, 2, 2, 0>, std::plus<float>, float>(at::native::(anonymous namespace)::TensorListMetadata<2>, at::native::(anonymous namespace)::BinaryOpListAlphaFunctor<float, 2, 2, 0>, std::plus<float>, float)",
+      "time_us": 8207.163000000002,
+      "share": 0.23777208820297163
+    },
+    {
+      "op": "volta_sgemm_128x64_nn",
+      "time_us": 6698.849000000011,
+      "share": 0.19407428794656456
+    },
+    {
+      "op": "void at::native::reduce_kernel<512, 1, at::native::ReduceOp<float, at::native::MeanOps<float, float, float, float>, unsigned int, float, 4, 4> >(at::native::ReduceOp<float, at::native::MeanOps<float, float, float, float>, unsigned int, float, 4, 4>)",
+      "time_us": 150.08100000000286,
+      "share": 0.0043480399706440406
+    },
+    {
+      "op": "Memset (Device)",
+      "time_us": 85.56700000006549,
+      "share": 0.002478986255211361
+    }
+  ],
+  "gemm_share": 0.7467187987622989,
+  "sync": {
+    "cpu_ms_no_sync": 2.5831809999772304,
+    "cpu_ms_item_each_step": 11.611686999913218,
+    "steps": 10
+  },
+  "note": "shares recomputed after excluding the record_function label Optimizer.step#SGD.step"
+}

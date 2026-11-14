@@ -1,0 +1,51 @@
+{
+  "env": {
+    "python": "3.13.16",
+    "platform": "Linux-6.18.55+-x86_64-with-glibc2.39",
+    "git_commit": "16d9b49",
+    "timestamp": "2026-11-14T11:49:01Z",
+    "torch": "2.11.0+cu130",
+    "cuda": "13.0",
+    "gpu": "Tesla T4"
+  },
+  "checks": [
+    {
+      "n": 1,
+      "add_matches_torch": true,
+      "fused_relu_matches_torch": true
+    },
+    {
+      "n": 1000,
+      "add_matches_torch": true,
+      "fused_relu_matches_torch": true
+    },
+    {
+      "n": 1023,
+      "add_matches_torch": true,
+      "fused_relu_matches_torch": true
+    },
+    {
+      "n": 1025,
+      "add_matches_torch": true,
+      "fused_relu_matches_torch": true
+    },
+    {
+      "n": 98432,
+      "add_matches_torch": true,
+      "fused_relu_matches_torch": true
+    },
+    {
+      "n": 1000003,
+      "add_matches_torch": true,
+      "fused_relu_matches_torch": true
+    }
+  ],
+  "benchmark": {
+    "torch_add_ms": 2.463442000021132,
+    "triton_add_ms": 2.5019734999887078,
+    "torch_add_then_relu_ms": 4.1404860000398,
+    "triton_fused_add_relu_ms": 2.4884389999897394,
+    "triton_add_gb_per_s": 239.81069343968193,
+    "fusion_speedup": 1.6638888877954705
+  }
+}

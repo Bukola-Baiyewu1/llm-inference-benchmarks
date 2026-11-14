@@ -1,0 +1,34 @@
+{
+  "env": {
+    "python": "3.13.16",
+    "platform": "Linux-6.18.55+-x86_64-with-glibc2.39",
+    "git_commit": "16d9b49",
+    "timestamp": "2026-11-14T11:49:17Z",
+    "torch": "2.11.0+cu130",
+    "cuda": "13.0",
+    "gpu": "Tesla T4"
+  },
+  "jax": "0.11.1",
+  "rows": [
+    {
+      "mode": "batch",
+      "x_sharding": "P('data', None)",
+      "w_sharding": "P(None, None)",
+      "communication_ops": [],
+      "has_all_reduce": false,
+      "matches_unsharded": true,
+      "output_sharding": "P('data', None)"
+    },
+    {
+      "mode": "contraction",
+      "x_sharding": "P(None, ('data', 'model'))",
+      "w_sharding": "P(('data', 'model'), None)",
+      "communication_ops": [
+        "all-reduce"
+      ],
+      "has_all_reduce": true,
+      "matches_unsharded": true,
+      "output_sharding": "P()"
+    }
+  ]
+}
